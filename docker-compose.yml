@@ -1,13 +1,26 @@
 version: '3'
 
 services:
-    nginx:
-       build: .
-       container_name: 'nginx-prueba'
-       volumes:
-         - ./nginx/conf.d/:/etc/nginx/conf.d/
-         - ./html:/var/www
-       ports:
-          - "80:80"
-       environment:
-           - NGINX_PORT=80
+  nginx:
+    build:
+      context: .
+      dockerfile: DockerfileNginx
+    container_name: 'nginx-prueba'
+    volumes:
+      - ./nginx/conf.d/:/etc/nginx/conf.d/
+      - ./images:/var/images
+      - ./html:/var/www
+    ports:
+      - '9000:80'
+    environment:
+      - NGINX_PORT=80
+  sercopidownload:
+    build:
+      context: .
+      dockerfile: DockerfileApache
+    container_name: apache
+    volumes:
+      - ./html:/app
+    ports:
+      - 8080:8080
+      - 3306:3306
