@@ -8,10 +8,12 @@ services:
     container_name: 'nginx-prueba'
     volumes:
       - ./nginx/conf.d/:/etc/nginx/conf.d/
+      - ./nginx/nginx.conf:/etc/nginx/nginx.conf
       - ./images:/var/images
       - ./html:/var/www
     ports:
       - '9000:80'
+      - '400:400'
     environment:
       - NGINX_PORT=80
   sercopidownload:
@@ -24,3 +26,21 @@ services:
     ports:
       - 8080:8080
       - 3306:3306
+  express_app:
+    build:
+      context: .
+      dockerfile: DockerfileExpress
+    #container_name: express_app (cant have a name, bc its going to be duplicated)
+    volumes:
+      - ./app/express3:/app
+    ports:
+      - '3000'
+    restart: always
+  mongo:
+    image: mongo
+    restart: always
+    environment:
+      MONGO_INITDB_ROOT_USERNAME: root
+      MONGO_INITDB_ROOT_PASSWORD: example
+    ports:
+      - 27017:27017
