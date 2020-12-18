@@ -37,9 +37,8 @@ app.post('/register', (req, res, next) => {
     if (userExists(newUser)) {
       return res.send('User Already Exists!');
     }
-    console.log(newUser.name);
+    //console.log(newUser.name);
     hash = bcrypt.hash(newUser.passwd, 10).then(hash => console.log(hash));
-    console.log(hash);
     return true;
     try {
       client
