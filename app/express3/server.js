@@ -1,6 +1,8 @@
 const express = require('express');
 const bodyParser = require('body-parser');
 const bcrypt = require('bcrypt');
+const jwt = require('jsonwebtoken');
+const fs = require('fs');
 const os = require('os');
 const app = express();
 const port = 3000;
@@ -76,10 +78,41 @@ app.post('/login', async (req, res, next) => {
     .then(result => result);
   if (passwwordsAreEqual) {
     res.status(200);
-    return res.send('user Logged');
+    // sign with RSA SHA256
+    const privateKey = fs.readFileSync('./auth/jwt/private.pem');
+    const token = jwt.sign(
+      { name: user.name },
+      { key: privateKey, passphrase: 'password' },
+      {
+        algorithm: 'RS256'
+      },
+      { expiresIn: 10 }
+    );
+    return res.send(JSON.stringify({ token: token }));
   }
   res.status(401);
   res.send('Bad Credentials');
+});
+//by standard, at client the token should be stored in local storage or cookies
+//we simmulate this beahviour with postman in Authorization section on the request
+//so the request comes with a header that contains the jwt like it normally would
+app.post('/jwtTest', async (req, res, next) => {
+  const token = req.headers.authorization.split(' ');
+  if (token[0] !== 'Bearer') {
+    console.log('es distinto de bearer');
+    res.status(401);
+    return res.send('Unauthorized');
+  }
+  try {
+    const pubKey = fs.readFileSync('./auth/jwt/public.pem');
+    const decoded = await jwt.verify(token[1], pubKey);
+    res.status(200);
+    res.send(`logged as ${decoded.name}`);
+  } catch (error) {
+    console.error(error);
+    res.status(401);
+    return res.send('Unauthorized');
+  }
 });
 
 //PRUEBAS

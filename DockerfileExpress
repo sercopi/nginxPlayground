@@ -3,4 +3,4 @@ RUN mkdir /app
 WORKDIR /app 
 COPY ./app/express3/package*.json ./
 RUN npm i
-CMD ["npm", "run", "start-dev"]
+CMD ["sh", "./startExpress.sh"]
