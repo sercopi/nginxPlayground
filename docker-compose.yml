@@ -16,16 +16,6 @@ services:
       - '400:400'
     environment:
       - NGINX_PORT=80
-  sercopidownload:
-    build:
-      context: .
-      dockerfile: DockerfileApache
-    container_name: apache
-    volumes:
-      - ./html:/app
-    ports:
-      - 8080:8080
-      - 3306:3306
   express_app:
     build:
       context: .

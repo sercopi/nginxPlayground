@@ -8,55 +8,53 @@ const { MongoClient } = require('mongodb');
 const ObjectId = require('mongodb').ObjectId;
 app.use(bodyParser.json());
 const url = 'mongodb://root:example@mongo:27017';
-const userExists = user => {
-  MongoClient.connect(url, function(err, client) {
-    try {
-      const userFound = client
-        .db('prueba')
-        .collection('users')
-        .findOne({ name: user.name });
-      return userFound;
-    } catch (error) {
+const getConnection = async (database, collection = null) => {
+  return await MongoClient(url, { useUnifiedTopology: true })
+    .connect()
+    .then(client =>
+      collection
+        ? client.db(database).collection(collection)
+        : client.db(database)
+    )
+    .catch(error => {
       console.error(error);
-    } finally {
-      client.close();
-    }
-  });
+      return null;
+    });
 };
 //Create User
-app.post('/register', (req, res, next) => {
-  //res.send(os.hostname());
+app.post('/register', async (req, res, next) => {
+  //res.send(os.hostname())
   //basic mongodb connection
   //db.createUser({user:"pruebauser",pwd:"1234",roles:[{role:"readWrite",db:"prueba"}]})
   newUser = {
     name: req.body.name,
     passwd: req.body.passwd,
-    created_at: new Date().toString
+    created_at: new Date().toString()
   };
-  MongoClient.connect(url, function(err, client) {
-    if (userExists(newUser)) {
-      return res.send('User Already Exists!');
-    }
-    //console.log(newUser.name);
-    hash = bcrypt.hash(newUser.passwd, 10).then(hash => console.log(hash));
-    return true;
-    try {
-      client
-        .db('prueba')
-        .collection('users')
-        .insertOne({ ...newUser });
+  const hash = await bcrypt.hash(newUser.passwd, 10).then(hash => hash);
+  newUser.passwd = hash;
+  const userFound = await getConnection('prueba', 'users').then(connection =>
+    connection.findOne({
+      name: newUser.name
+    })
+  );
+  if (userFound) {
+    res.status(422);
+    return res.send('User already exists!');
+  }
+  getConnection('prueba', 'users')
+    .then(connection => connection.insertOne({ ...newUser }))
+    .then(() => {
       res.status(200);
-      res.send('Succesfully created!');
-    } catch (error) {
-      res.status(error.status);
-      res.send(error);
-    } finally {
-      client.close();
-    }
-  });
+      res.send('User Registered!');
+    })
+    .catch(error => {
+      res.status(500);
+      res.send('Error with server');
+    });
 });
 //login
-app.post('/login', (req, res, next) => {
+app.post('/login', async (req, res, next) => {
   //res.send(os.hostname());
   //basic mongodb connection
   //db.createUser({user:"pruebauser",pwd:"1234",roles:[{role:"readWrite",db:"prueba"}]})
@@ -64,21 +62,24 @@ app.post('/login', (req, res, next) => {
     name: req.body.name,
     passwd: req.body.passwd
   };
-  MongoClient.connect(url, function(err, client) {
-    try {
-      client
-        .db('prueba')
-        .collection('users')
-        .findOne({});
-      res.status(200);
-      res.send('Succesfully created!');
-    } catch (error) {
-      res.status(error.status);
-      res.send(error);
-    } finally {
-      client.close();
-    }
-  });
+  //obtain passwd from DB
+  const userFromDB = await getConnection('prueba', 'users').then(connection =>
+    connection.findOne({ name: user.name })
+  );
+
+  if (!userFromDB) {
+    res.status(401);
+    return res.send('User name invalid');
+  }
+  const passwwordsAreEqual = await bcrypt
+    .compare(user.passwd, userFromDB.passwd)
+    .then(result => result);
+  if (passwwordsAreEqual) {
+    res.status(200);
+    return res.send('user Logged');
+  }
+  res.status(401);
+  res.send('Bad Credentials');
 });
 
 //PRUEBAS
@@ -149,6 +150,5 @@ app.listen(port, () => {
   console.log(`Example app listening at http://localhost:${port}`);
 });
 //TODO
-//login
 //JWT
 //Manejo Errores
