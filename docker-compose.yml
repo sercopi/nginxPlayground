@@ -27,8 +27,12 @@ services:
       - '3000'
     restart: always
   mongo:
-    image: mongo
+    build:
+      context: .
+      dockerfile: DockerfileMongo
     restart: always
+    volumes:
+      - ./database/:/database/
     environment:
       MONGO_INITDB_ROOT_USERNAME: root
       MONGO_INITDB_ROOT_PASSWORD: example
