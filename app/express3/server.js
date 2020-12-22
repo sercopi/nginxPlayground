@@ -8,6 +8,9 @@ const app = express();
 const port = 3000;
 const { MongoClient } = require('mongodb');
 const ObjectId = require('mongodb').ObjectId;
+const cors = require('cors');
+app.use(cors());
+app.options('*', cors());
 app.use(bodyParser.json());
 const url = 'mongodb://root:example@mongo:27017';
 const getConnection = async (database, collection = null) => {
@@ -23,11 +26,24 @@ const getConnection = async (database, collection = null) => {
       return null;
     });
 };
+//check token
+const checkToken=(tokenFromClient)=>{
+  const token = tokenFromClient.split(' ');
+  if (token[0] !== 'Bearer') {
+    return false
+  }
+  try {
+    const pubKey = fs.readFileSync('./auth/jwt/public.pem');
+    const decoded = await jwt.verify(token[1], pubKey);
+    return decoded
+  } catch (error) {
+    console.error(error)
+    return false
+  }
+}
 //Create User
 app.post('/register', async (req, res, next) => {
-  //res.send(os.hostname())
-  //basic mongodb connection
-  //db.createUser({user:"pruebauser",pwd:"1234",roles:[{role:"readWrite",db:"prueba"}]})
+  console.log(req.body);
   newUser = {
     name: req.body.name,
     passwd: req.body.passwd,
@@ -41,18 +57,34 @@ app.post('/register', async (req, res, next) => {
     })
   );
   if (userFound) {
-    res.status(422);
-    return res.send('User already exists!');
+    res
+      .status(422)
+      .send({ status: 422, error: true, message: 'User already exists!' });
+    return true;
   }
   getConnection('prueba', 'users')
     .then(connection => connection.insertOne({ ...newUser }))
     .then(() => {
-      res.status(200);
-      res.send('User Registered!');
+      res
+        .status(200)
+        .send(
+          JSON.stringify({
+            status: 200,
+            error: false,
+            message: 'created succesfully!'
+          })
+        );
     })
     .catch(error => {
-      res.status(500);
-      res.send('Error with server');
+      res
+        .status(500)
+        .send(
+          JSON.stringify({
+            status: 500,
+            error: true,
+            message: 'Error with Server'
+          })
+        );
     });
 });
 //login
@@ -70,15 +102,18 @@ app.post('/login', async (req, res, next) => {
   );
 
   if (!userFromDB) {
-    res.status(401);
-    return res.send('User name invalid');
+    return res.status(401).send(
+      JSON.stringify({
+        status: 401,
+        error: true,
+        message: 'User name invalid'
+      })
+    );
   }
   const passwwordsAreEqual = await bcrypt
     .compare(user.passwd, userFromDB.passwd)
     .then(result => result);
   if (passwwordsAreEqual) {
-    res.status(200);
-    // sign with RSA SHA256
     const privateKey = fs.readFileSync('./auth/jwt/private.pem');
     const token = jwt.sign(
       { name: user.name },
@@ -88,32 +123,27 @@ app.post('/login', async (req, res, next) => {
       },
       { expiresIn: 10 }
     );
-    return res.send(JSON.stringify({ token: token }));
+    return res.status(200).send(
+      JSON.stringify({
+        status: 200,
+        error: false,
+        token: token,
+        user: userFromDB
+      })
+    );
   }
-  res.status(401);
-  res.send('Bad Credentials');
+  res
+    .status(401)
+    .send({ status: 401, error: true, message: 'Bad Credentials' });
 });
 //by standard, at client the token should be stored in local storage or cookies
 //we simmulate this beahviour with postman in Authorization section on the request
 //so the request comes with a header that contains the jwt like it normally would
-app.post('/jwtTest', async (req, res, next) => {
-  const token = req.headers.authorization.split(' ');
-  if (token[0] !== 'Bearer') {
-    console.log('es distinto de bearer');
-    res.status(401);
-    return res.send('Unauthorized');
-  }
-  try {
-    const pubKey = fs.readFileSync('./auth/jwt/public.pem');
-    const decoded = await jwt.verify(token[1], pubKey);
-    res.status(200);
-    res.send(`logged as ${decoded.name}`);
-  } catch (error) {
-    console.error(error);
-    res.status(401);
-    return res.send('Unauthorized');
-  }
+app.post('/jwtCheck', async (req, res, next) => {
+  const isTokenCorrect = checkToken(req.headers.authorization)
+  
 });
+
 
 //PRUEBAS
 /* const connect = async uri => {
