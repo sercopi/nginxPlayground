@@ -13,14 +13,17 @@
           <v-tab to="/">
             <v-icon class="mr-2">mdi-home</v-icon>HOME
           </v-tab>
-          <v-tab to="/login">
+          <v-tab v-if="!isLogged" to="/login">
             <v-icon class="mr-2">mdi-key</v-icon>LOGIN
           </v-tab>
-          <v-tab to="/register">
+          <v-tab v-if="!isLogged" to="/register">
             <v-icon class="mr-2">mdi-key</v-icon>REGISTER
           </v-tab>
-          <v-tab to="/profile">
+          <v-tab v-if="isLogged"  to="/profile">
             <v-icon class="mr-2">mdi-account</v-icon>My Profile
+          </v-tab>
+          <v-tab v-if="isLogged" @click.prevent="logOut">
+            <v-icon class="mr-2">mdi-logout</v-icon>log out
           </v-tab>
         </v-tabs>
       </template>
@@ -56,10 +59,16 @@
 </template>
 
 <script>
+import {mapGetters,mapActions} from "vuex";
 export default {
   name: "App",
   data() {
     return { boolean: true };
+  },
+  computed: {
+    ...mapGetters(["isLogged"])
+  },methods:{
+    ...mapActions(["logOut"])
   }
 };
 </script>

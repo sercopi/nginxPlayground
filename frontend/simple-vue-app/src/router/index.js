@@ -5,7 +5,9 @@ import Register from '../views/Register.vue';
 import Login from '../views/Login.vue';
 import Profile from '../views/Profile.vue';
 import About from '../views/About.vue';
-
+import store from "../store"
+/* import authStore from '../store/modules/auth';
+ */
 Vue.use(VueRouter);
 
 const routes = [
@@ -14,48 +16,65 @@ const routes = [
     name: 'home',
     component: Home,
     meta: {
-      requiresAuth: false
-    }
+      requiresAuth: false,
+      requiresGuest:true
+    },
   },
   {
     path: '/register',
     name: 'register',
     component: Register,
     meta: {
-      requiresAuth: false
-    }
+      requiresAuth: false,
+    },
   },
   {
     path: '/profile',
     name: 'profile',
     component: Profile,
     meta: {
-      requiresAuth: true
-    }
+      requiresAuth: true,
+    },
   },
   {
     path: '/login',
     name: 'login',
     component: Login,
     meta: {
-      requiresAuth: false
-    }
+      requiresAuth: false,
+    },
   },
   {
     path: '/about',
     name: 'about',
     component: About,
     meta: {
-      requiresAuth: false
-    }
-  }
+      requiresAuth: false,
+    },
+  },
 ];
 
 const router = new VueRouter({
-  routes
+  routes,
 });
-
-/* router.beforeEach((to, from, next) => {
-
-}); */
+// eslint-disable-next-line no-unused-vars
+router.beforeEach( (to,from,next) => {
+  console.log('entering route');
+  const isLogged = store.state.Auth.isLogged;
+  if (to.matched.some((record) => record.meta.requiresGuest)) {
+    return next()
+  }
+  if (!to.matched.some((record) => record.meta.requiresAuth) && !isLogged) {
+    return next()
+  }
+  if (to.matched.some((record) => record.meta.requiresAuth) && isLogged) {
+    return next()
+  }
+  next({
+    path: '/login',
+    query: {
+      redirect: to.fullPath,
+    },
+  }); 
+});
 export default router;

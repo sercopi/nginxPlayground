@@ -27,12 +27,9 @@ export default {
   data() {
     return {};
   },
-  methods: {}
+  
 };
 </script>
 <style lang="css">
-#background {
-  background-image: url("https://desenio.es/bilder/artiklar/zoom/11774_2.jpg");
-  background-size: cover;
-}
+
 </style>

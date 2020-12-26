@@ -4,6 +4,7 @@ const bcrypt = require('bcrypt');
 const jwt = require('jsonwebtoken');
 const fs = require('fs');
 const os = require('os');
+const moment = require('moment');
 const app = express();
 const port = 3000;
 const { MongoClient } = require('mongodb');
@@ -16,44 +17,89 @@ const url = 'mongodb://root:example@mongo:27017';
 const getConnection = async (database, collection = null) => {
   return await MongoClient(url, { useUnifiedTopology: true })
     .connect()
-    .then(client =>
+    .then((client) =>
       collection
         ? client.db(database).collection(collection)
         : client.db(database)
     )
-    .catch(error => {
+    .catch((error) => {
       console.error(error);
       return null;
     });
 };
 //check token
-const checkToken=(tokenFromClient)=>{
+const checkToken = async (tokenFromClient) => {
   const token = tokenFromClient.split(' ');
   if (token[0] !== 'Bearer') {
-    return false
+    return false;
   }
   try {
     const pubKey = fs.readFileSync('./auth/jwt/public.pem');
     const decoded = await jwt.verify(token[1], pubKey);
-    return decoded
+    return decoded;
   } catch (error) {
-    console.error(error)
-    return false
+    return false;
   }
-}
+};
+const guestRoutes = ['/', '/register', '/login'];
+//Authentication middleware, deals with tokens magic
+const checkTokenMiddleware = async (req, res, next) => {
+  //if the route doesnt require a token, it lets it through
+  if (guestRoutes.includes(req.path)) return next();
+  //the token is decoded.
+  const tokenDecoded = await checkToken(req.headers.authorization);
+  //check if the token can be uncoded AND check if final expiration date is due
+  if (
+    tokenDecoded !== false &&
+    !moment().isAfter(tokenDecoded.finalExpirationDate)
+  ) {
+    //the token is refreshed and its data is passed to the next route
+    console.log("refreshing token!")
+    res.locals.payload = tokenDecoded.payload;
+    res.locals.Auth = await generateToken(
+      tokenDecoded.payload,
+      tokenDecoded.finalExpirationDate
+    );
+    return next();
+  }
+  //if the token expired or is not coded correctly,
+  //send back an auth error to be handled by the client
+  res.send({ status: 440, error: true, message: 'Session Expired' });
+};
+//generate token or refresh an old one if a finalExpirationDate is passed
+const generateToken = async (payload, finalExpirationDate = null) => {
+  const privateKey = fs.readFileSync('./auth/jwt/private.pem');
+
+  //if there comes a token, it is refreshed only if the finalExpiraton date is not due
+  return jwt.sign(
+    {
+      payload: { ...payload },
+      finalExpirationDate: finalExpirationDate
+        ? finalExpirationDate
+        : moment().add(20, 'minutes').format(),
+    },
+    { key: privateKey, passphrase: 'password' },
+    {
+      algorithm: 'RS256',
+    },
+    { expiresIn: 10 }
+  );
+};
+app.all('*', checkTokenMiddleware);
+
 //Create User
 app.post('/register', async (req, res, next) => {
   console.log(req.body);
   newUser = {
     name: req.body.name,
     passwd: req.body.passwd,
-    created_at: new Date().toString()
+    created_at: new Date().toString(),
   };
-  const hash = await bcrypt.hash(newUser.passwd, 10).then(hash => hash);
+  const hash = await bcrypt.hash(newUser.passwd, 10).then((hash) => hash);
   newUser.passwd = hash;
-  const userFound = await getConnection('prueba', 'users').then(connection =>
+  const userFound = await getConnection('prueba', 'users').then((connection) =>
     connection.findOne({
-      name: newUser.name
+      name: newUser.name,
     })
   );
   if (userFound) {
@@ -63,41 +109,34 @@ app.post('/register', async (req, res, next) => {
     return true;
   }
   getConnection('prueba', 'users')
-    .then(connection => connection.insertOne({ ...newUser }))
+    .then((connection) => connection.insertOne({ ...newUser }))
     .then(() => {
-      res
-        .status(200)
-        .send(
-          JSON.stringify({
-            status: 200,
-            error: false,
-            message: 'created succesfully!'
-          })
-        );
+      res.status(200).send(
+        JSON.stringify({
+          status: 200,
+          error: false,
+          message: 'created succesfully!',
+        })
+      );
     })
-    .catch(error => {
-      res
-        .status(500)
-        .send(
-          JSON.stringify({
-            status: 500,
-            error: true,
-            message: 'Error with Server'
-          })
-        );
+    .catch((error) => {
+      res.status(500).send(
+        JSON.stringify({
+          status: 500,
+          error: true,
+          message: 'Error with Server',
+        })
+      );
     });
 });
 //login
 app.post('/login', async (req, res, next) => {
-  //res.send(os.hostname());
-  //basic mongodb connection
-  //db.createUser({user:"pruebauser",pwd:"1234",roles:[{role:"readWrite",db:"prueba"}]})
   user = {
     name: req.body.name,
-    passwd: req.body.passwd
+    passwd: req.body.passwd,
   };
   //obtain passwd from DB
-  const userFromDB = await getConnection('prueba', 'users').then(connection =>
+  const userFromDB = await getConnection('prueba', 'users').then((connection) =>
     connection.findOne({ name: user.name })
   );
 
@@ -106,29 +145,21 @@ app.post('/login', async (req, res, next) => {
       JSON.stringify({
         status: 401,
         error: true,
-        message: 'User name invalid'
+        message: 'User name invalid',
       })
     );
   }
   const passwwordsAreEqual = await bcrypt
     .compare(user.passwd, userFromDB.passwd)
-    .then(result => result);
+    .then((result) => result);
   if (passwwordsAreEqual) {
-    const privateKey = fs.readFileSync('./auth/jwt/private.pem');
-    const token = jwt.sign(
-      { name: user.name },
-      { key: privateKey, passphrase: 'password' },
-      {
-        algorithm: 'RS256'
-      },
-      { expiresIn: 10 }
-    );
+    const token = await generateToken({ name: userFromDB.name });
     return res.status(200).send(
       JSON.stringify({
         status: 200,
         error: false,
         token: token,
-        user: userFromDB
+        payload: { user: { name: userFromDB.name } },
       })
     );
   }
@@ -139,75 +170,20 @@ app.post('/login', async (req, res, next) => {
 //by standard, at client the token should be stored in local storage or cookies
 //we simmulate this beahviour with postman in Authorization section on the request
 //so the request comes with a header that contains the jwt like it normally would
-app.post('/jwtCheck', async (req, res, next) => {
-  const isTokenCorrect = checkToken(req.headers.authorization)
-  
+app.post('/profile', async (req, res, next) => {});
+app.post('/checkAuthParams', async (req, res, next) => {
+  console.log("auth params checked")
+  const payload = res.locals.payload;
+  const token = res.locals.token;
+  return res.status(200).send(
+    JSON.stringify({
+      status: 200,
+      error: false,
+      token: token,
+      payload: { ...payload },
+    })
+  );
 });
-
-
-//PRUEBAS
-/* const connect = async uri => {
-  try {
-    var mongoclient = new MongoClient(uri, {
-      native_parser: true
-    });
-
-    // Open the connection to the server
-    mongoclient.open(function(err, mongoclient) {
-      // Get the first db and do an update document on it
-      var db = mongoclient.db('prueba');
-      console.log(db);
-    });
-  } catch (error) {
-    console.error(error);
-  } finally {
-    client.close();
-  }
-};
-const response = {
-  id: os.hostname()
-};
-app.get('/', (req, res) => {
-  //res.send(os.hostname());
-  //basic mongodb connection
-  //db.createUser({user:"pruebauser",pwd:"1234",roles:[{role:"readWrite",db:"prueba"}]})
-  MongoClient.connect(url, function(err, client) {
-    const cursor = client
-      .db('prueba')
-      .collection('prueba-collection')
-      .find();
-    const result = [];
-    cursor.forEach(doc => result.push(doc));
-    response.query = result;
-    res.send(response);
-    client.close();
-  });
-});
-app.get('/:id', (req, res) => {
-  MongoClient.connect(url, function(err, client) {
-    const doc = client
-      .db('prueba')
-      .collection('prueba-collection')
-      .findOne({ _id: ObjectId(req.params.id) });
-    res.send(doc);
-  });
-});
-app.put('/:id', (req, res) => {
-  MongoClient.connect(url, function(err, client) {
-    client
-      .db('prueba')
-      .collection('prueba-collection')
-      .updateOne(
-        { _id: ObjectId(req.params.id) },
-        {
-          $set: { ...req.body },
-          $currentDate: { lastModified: true }
-        }
-      )
-      .then(() => res.status(200))
-      .catch(error => res.status(error.statusCode));
-  });
-}); */
 
 app.listen(port, () => {
   console.log(`Example app listening at http://localhost:${port}`);

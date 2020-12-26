@@ -41,6 +41,7 @@
 </template>
 <script>
 import constants from "@/lib/constants";
+import {mapActions} from "vuex";
 export default {
   data() {
     return {
@@ -64,6 +65,7 @@ export default {
     };
   },
   methods: {
+    ...mapActions(["setNewAuthParams"]),
     forgot_password() {},
     login() {
       this.loading = true;
@@ -85,9 +87,8 @@ export default {
             this.loading = false;
             return false;
           }
-          localStorage.setItem("user", JSON.stringify(response.user));
-          localStorage.setItem("token", response.token);
-          this.$router.push({ name: "home" });
+          this.setNewAuthParams({user:response.payload.user,token:response.token});
+          this.$router.push({ name: "profile" });
         })
         .catch(error => {
           this.loading = false;
