@@ -9,7 +9,9 @@
           height="1500"
           width="1500"
           class="text-center pt-5"
-        ></v-sheet>
+        >
+        
+        </v-sheet>
       </v-col>
     </v-row>
   </v-container>

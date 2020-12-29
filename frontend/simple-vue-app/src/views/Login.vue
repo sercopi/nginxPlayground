@@ -15,7 +15,7 @@
       </v-row>
       <v-row>
         <v-col cols="12">
-          <v-text-field v-model="email" :rules="emailRules" :counter="10" label="Username" required></v-text-field>
+          <v-text-field v-model="email" :rules="emailRules" :counter="10" label="email" required></v-text-field>
         </v-col>
 
         <v-col cols="12">
@@ -72,8 +72,8 @@ export default {
       fetch(constants.API_URL + "/login", {
         method: "post",
         body: JSON.stringify({
-          name: this.email,
-          passwd: this.password
+          email: this.email,
+          password: this.password
         }),
         headers: {
           "Content-Type": "application/json"

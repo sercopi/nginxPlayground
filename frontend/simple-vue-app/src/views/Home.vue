@@ -14,6 +14,7 @@
             <v-icon class="mr-2" aria-hidden="false" large color="black">mdi-paw</v-icon>simple vue app example
             <v-icon class="ml-2" aria-hidden="false" large color="black">mdi-paw</v-icon>
           </h1>
+          <img src="https://product-image.juniqe-production.juniqe.com/media/catalog/product/seo-cache/x800/18/29/18-29-101L/Cat-Laura-Graves-Poster.jpg" alt="home_image">
         </v-sheet>
       </v-col>
     </v-row>

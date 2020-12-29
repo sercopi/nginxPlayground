@@ -5,7 +5,8 @@ import Register from '../views/Register.vue';
 import Login from '../views/Login.vue';
 import Profile from '../views/Profile.vue';
 import About from '../views/About.vue';
-import store from "../store"
+import store from '../store';
+import VerifyEmail from '../views/VerifyEmail';
 /* import authStore from '../store/modules/auth';
  */
 Vue.use(VueRouter);
@@ -17,7 +18,16 @@ const routes = [
     component: Home,
     meta: {
       requiresAuth: false,
-      requiresGuest:true
+      requiresGuest: true,
+    },
+  },
+  {
+    path: '/verifyEmail',
+    name: 'verifyEmail',
+    component: VerifyEmail,
+    meta: {
+      requiresAuth: false,
+      requiresGuest: true,
     },
   },
   {
@@ -58,23 +68,23 @@ const router = new VueRouter({
   routes,
 });
 // eslint-disable-next-line no-unused-vars
-router.beforeEach( (to,from,next) => {
+router.beforeEach((to, from, next) => {
   console.log('entering route');
   const isLogged = store.state.Auth.isLogged;
   if (to.matched.some((record) => record.meta.requiresGuest)) {
-    return next()
+    return next();
   }
   if (!to.matched.some((record) => record.meta.requiresAuth) && !isLogged) {
-    return next()
+    return next();
   }
   if (to.matched.some((record) => record.meta.requiresAuth) && isLogged) {
-    return next()
+    return next();
   }
   next({
     path: '/login',
     query: {
       redirect: to.fullPath,
     },
-  }); 
+  });
 });
 export default router;

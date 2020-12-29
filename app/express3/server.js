@@ -4,6 +4,7 @@ const bcrypt = require('bcrypt');
 const jwt = require('jsonwebtoken');
 const fs = require('fs');
 const os = require('os');
+const rabbit = require('./rabbitMQ/rabbit');
 const moment = require('moment');
 const app = express();
 const port = 3000;
@@ -28,20 +29,31 @@ const getConnection = async (database, collection = null) => {
     });
 };
 //check token
-const checkToken = async (tokenFromClient) => {
-  const token = tokenFromClient.split(' ');
-  if (token[0] !== 'Bearer') {
-    return false;
+const checkToken = async (tokenFromClient, isAuthToken = true) => {
+  let tokenArrayParts = tokenFromClient.split(' ');
+  let token = tokenFromClient;
+  if (isAuthToken) {
+    if (tokenArrayParts[0] !== 'Bearer') {
+      return false;
+    }
+    token = tokenArrayParts[1];
   }
   try {
     const pubKey = fs.readFileSync('./auth/jwt/public.pem');
-    const decoded = await jwt.verify(token[1], pubKey);
+    const decoded = await jwt.verify(token, pubKey);
     return decoded;
   } catch (error) {
+    console.log(error);
     return false;
   }
 };
-const guestRoutes = ['/', '/register', '/login'];
+const guestRoutes = [
+  '/',
+  '/register',
+  '/login',
+  '/verifyEmail',
+  '/forgotPassword',
+];
 //Authentication middleware, deals with tokens magic
 const checkTokenMiddleware = async (req, res, next) => {
   //if the route doesnt require a token, it lets it through
@@ -54,7 +66,7 @@ const checkTokenMiddleware = async (req, res, next) => {
     !moment().isAfter(tokenDecoded.finalExpirationDate)
   ) {
     //the token is refreshed and its data is passed to the next route
-    console.log("refreshing token!")
+    console.log('refreshing token!');
     res.locals.payload = tokenDecoded.payload;
     res.locals.Auth = await generateToken(
       tokenDecoded.payload,
@@ -91,35 +103,57 @@ app.all('*', checkTokenMiddleware);
 app.post('/register', async (req, res, next) => {
   console.log(req.body);
   newUser = {
-    name: req.body.name,
-    passwd: req.body.passwd,
+    email: req.body.email,
+    password: req.body.password,
+    firstName: req.body.firstName,
+    lastName: req.body.lastName,
     created_at: new Date().toString(),
   };
-  const hash = await bcrypt.hash(newUser.passwd, 10).then((hash) => hash);
-  newUser.passwd = hash;
+  const hash = await bcrypt.hash(newUser.password, 10).then((hash) => hash);
+  newUser.password = hash;
   const userFound = await getConnection('prueba', 'users').then((connection) =>
     connection.findOne({
-      name: newUser.name,
+      email: newUser.email,
     })
   );
   if (userFound) {
-    res
+    return res
       .status(422)
       .send({ status: 422, error: true, message: 'User already exists!' });
-    return true;
   }
-  getConnection('prueba', 'users')
-    .then((connection) => connection.insertOne({ ...newUser }))
-    .then(() => {
-      res.status(200).send(
+  await getConnection('prueba', 'users')
+    .then((connection) => connection.insertOne({ ...newUser, verified: false }))
+    .catch((error) => {
+      console.log(error);
+      res.status(500).send(
         JSON.stringify({
-          status: 200,
-          error: false,
-          message: 'created succesfully!',
+          status: 500,
+          error: true,
+          message: 'Error with Server',
         })
       );
-    })
+    });
+  const token = await generateToken({ email: newUser.email });
+  console.log('token generated: ');
+  console.log(token);
+  rabbit.getChannel().then((channel) => {
+    rabbit.dispatchVerifyEmailJobToEmailQueue(channel, {
+      email: newUser.email,
+      subject: 'please, verify your email!',
+      token: token,
+    });
+  });
+  res
+    .status(200)
+    .send(
+      JSON.stringify({
+        status: 200,
+        error: false,
+        message: 'created succesfully!',
+      })
+    )
     .catch((error) => {
+      console.log(error);
       res.status(500).send(
         JSON.stringify({
           status: 500,
@@ -132,34 +166,34 @@ app.post('/register', async (req, res, next) => {
 //login
 app.post('/login', async (req, res, next) => {
   user = {
-    name: req.body.name,
-    passwd: req.body.passwd,
+    email: req.body.email,
+    password: req.body.password,
   };
-  //obtain passwd from DB
+  //obtain password from DB
   const userFromDB = await getConnection('prueba', 'users').then((connection) =>
-    connection.findOne({ name: user.name })
+    connection.findOne({ email: user.email })
   );
 
-  if (!userFromDB) {
+  if (!userFromDB || !userFromDB.verified) {
     return res.status(401).send(
       JSON.stringify({
         status: 401,
         error: true,
-        message: 'User name invalid',
+        message: 'User email invalid',
       })
     );
   }
   const passwwordsAreEqual = await bcrypt
-    .compare(user.passwd, userFromDB.passwd)
+    .compare(user.password, userFromDB.password)
     .then((result) => result);
   if (passwwordsAreEqual) {
-    const token = await generateToken({ name: userFromDB.name });
+    const token = await generateToken({ email: userFromDB.email });
     return res.status(200).send(
       JSON.stringify({
         status: 200,
         error: false,
         token: token,
-        payload: { user: { name: userFromDB.name } },
+        payload: { user: { email: userFromDB.email } },
       })
     );
   }
@@ -167,12 +201,9 @@ app.post('/login', async (req, res, next) => {
     .status(401)
     .send({ status: 401, error: true, message: 'Bad Credentials' });
 });
-//by standard, at client the token should be stored in local storage or cookies
-//we simmulate this beahviour with postman in Authorization section on the request
-//so the request comes with a header that contains the jwt like it normally would
 app.post('/profile', async (req, res, next) => {});
-app.post('/checkAuthParams', async (req, res, next) => {
-  console.log("auth params checked")
+app.get('/checkAuthParams', async (req, res, next) => {
+  console.log('auth params checked');
   const payload = res.locals.payload;
   const token = res.locals.token;
   return res.status(200).send(
@@ -183,6 +214,46 @@ app.post('/checkAuthParams', async (req, res, next) => {
       payload: { ...payload },
     })
   );
+});
+
+app.get('/verifyEmail', async (req, res, next) => {
+  try {
+    const tokenDecoded = await checkToken(req.query.verifyToken, false);
+    console.log(tokenDecoded);
+    if (!tokenDecoded) {
+      return res.status(401).send(
+        JSON.stringify({
+          status: 401,
+          error: true,
+          message: 'email has expired, register again, please!',
+        })
+      );
+    }
+    await getConnection('prueba', 'users').then((connection) =>
+      connection.updateOne(
+        { email: tokenDecoded.payload.email },
+        { $set: { verified: true } }
+      )
+    );
+    const token = await generateToken({ email: tokenDecoded.payload.email });
+    return res.status(200).send(
+      JSON.stringify({
+        status: 200,
+        error: false,
+        token: token,
+        payload: { user: { email: tokenDecoded.payload.email } },
+      })
+    );
+  } catch (error) {
+    console.log(error);
+    res.status(500).send(
+      JSON.stringify({
+        status: 500,
+        error: true,
+        message: 'Error with Server',
+      })
+    );
+  }
 });
 
 app.listen(port, () => {

@@ -10,8 +10,7 @@ Vue.config.productionTip = false;
 
 const checkAuthParamsWithBackend = async (token) => {
   return fetch(constants.API_URL + '/checkAuthParams', {
-    method: 'post',
-    body: JSON.stringify({}),
+    method: 'get',
     headers: {
       Authorization: 'Bearer ' + token,
       'Content-Type': 'application/json',
@@ -26,17 +25,17 @@ const initApp = async () => {
     await checkAuthParamsWithBackend(token)
       .then((response) => {
         if (response.error) {
-          console.log("token missmatch")
+          console.log('token missmatch');
           localStorage.removeItem('user');
           localStorage.removeItem('token');
           return true;
         }
-        console.log("refresing token from client")
-        localStorage.setItem('user', user);
-        localStorage.setItem('token', token);
+        console.log('refresing token from client');
+        localStorage.setItem('user', JSON.stringify(response.payload.user));
+        localStorage.setItem('token', response.token);
         store.state.Auth.isLogged = true;
-        store.state.Auth.user = JSON.parse(user);
-        store.state.Auth.token = token;
+        store.state.Auth.user = response.payload.user;
+        store.state.Auth.token = response.token;
       })
       .catch((error) => {
         console.error(error);

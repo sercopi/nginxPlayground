@@ -20,7 +20,7 @@
             <v-icon class="mr-2">mdi-key</v-icon>REGISTER
           </v-tab>
           <v-tab v-if="isLogged"  to="/profile">
-            <v-icon class="mr-2">mdi-account</v-icon>My Profile
+            <v-icon class="mr-2">mdi-account</v-icon>{{user.email}}
           </v-tab>
           <v-tab v-if="isLogged" @click.prevent="logOut">
             <v-icon class="mr-2">mdi-logout</v-icon>log out
@@ -66,7 +66,7 @@ export default {
     return { boolean: true };
   },
   computed: {
-    ...mapGetters(["isLogged"])
+    ...mapGetters(["isLogged","user"])
   },methods:{
     ...mapActions(["logOut"])
   }

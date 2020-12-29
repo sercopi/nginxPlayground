@@ -1,2 +1,4 @@
 node_modules
 /app/express3/auth/jwt
+/app/express3/rabbitMQ
+.eslintrc.json

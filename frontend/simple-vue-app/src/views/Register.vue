@@ -7,7 +7,14 @@
         </v-col>
       </v-row>
     </v-container>
-    <v-container v-if="!loading">
+    <v-container v-if="!loading && verifying">
+    <v-row><v-col>
+      <h1>please, verify your email!</h1>
+      <p>An verification URL has been sent to your email, please check it to log in!</p>
+      <img src="https://previews.123rf.com/images/sauvignon/sauvignon1506/sauvignon150600377/41120385-cat-with-magnifying-glass-and-searching.jpg" alt="verify">
+    </v-col></v-row>
+    </v-container>
+    <v-container v-if="!loading && !verifying">
       <v-row v-if="error">
         <v-col>
           <v-alert border="left" color="red" dismissible type="error">{{message}}</v-alert>
@@ -16,7 +23,7 @@
       <v-row>
         <v-col cols="12">
           <v-text-field
-            v-model="firstname"
+            v-model="firstName"
             :rules="nameRules"
             :counter="10"
             label="First name"
@@ -26,7 +33,7 @@
 
         <v-col cols="12">
           <v-text-field
-            v-model="lastname"
+            v-model="lastName"
             :rules="nameRules"
             :counter="10"
             label="Last name"
@@ -75,6 +82,7 @@ import constants from "@/lib/constants";
 export default {
   data() {
     return {
+      verifying:false,
       loading: false,
       message: "",
       error: false,
@@ -82,8 +90,8 @@ export default {
       show2: false,
       response: null,
       valid: false,
-      firstname: "",
-      lastname: "",
+      firstName: "",
+      lastName: "",
       password: "",
       verifypass: "",
       email: "",
@@ -121,8 +129,10 @@ export default {
       fetch(constants.API_URL + "/register", {
         method: "post",
         body: JSON.stringify({
-          name: this.email,
-          passwd: this.password
+          firstName:this.firstName,
+          lastName:this.lastName,
+          email: this.email,
+          password: this.password
         }),
         headers: {
           "Content-Type": "application/json"
@@ -136,7 +146,7 @@ export default {
             this.message = response.message;
             return false;
           }
-          this.$router.push({ name: "login" });
+          this.verifying=true;
         })
         .catch(error => {
           this.error = false;
