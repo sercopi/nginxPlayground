@@ -2,7 +2,10 @@
   <v-app>
     <v-app-bar color="primary" dark app prominent>
       <template v-slot:img="{ props }">
-        <v-img v-bind="props" gradient="to top right, rgba(100,115,201,.7), rgba(25,32,72,.7)"></v-img>
+        <v-img
+          v-bind="props"
+          gradient="to top right, rgba(100,115,201,.7), rgba(25,32,72,.7)"
+        ></v-img>
       </template>
       <v-app-bar-nav-icon></v-app-bar-nav-icon>
 
@@ -10,17 +13,15 @@
 
       <template v-slot:extension>
         <v-tabs align-with-title>
-          <v-tab to="/">
-            <v-icon class="mr-2">mdi-home</v-icon>HOME
-          </v-tab>
+          <v-tab to="/"> <v-icon class="mr-2">mdi-home</v-icon>HOME </v-tab>
           <v-tab v-if="!isLogged" to="/login">
             <v-icon class="mr-2">mdi-key</v-icon>LOGIN
           </v-tab>
           <v-tab v-if="!isLogged" to="/register">
             <v-icon class="mr-2">mdi-key</v-icon>REGISTER
           </v-tab>
-          <v-tab v-if="isLogged"  to="/profile">
-            <v-icon class="mr-2">mdi-account</v-icon>{{user.email}}
+          <v-tab v-if="isLogged" to="/profile">
+            <v-icon class="mr-2">mdi-account</v-icon>{{ user.email }}
           </v-tab>
           <v-tab v-if="isLogged" @click.prevent="logOut">
             <v-icon class="mr-2">mdi-logout</v-icon>log out
@@ -59,16 +60,17 @@
 </template>
 
 <script>
-import {mapGetters,mapActions} from "vuex";
-export default {
-  name: "App",
-  data() {
-    return { boolean: true };
-  },
-  computed: {
-    ...mapGetters(["isLogged","user"])
-  },methods:{
-    ...mapActions(["logOut"])
-  }
-};
+  import { mapGetters, mapActions } from 'vuex';
+  export default {
+    name: 'App',
+    data() {
+      return { boolean: true };
+    },
+    computed: {
+      ...mapGetters(['isLogged', 'user']),
+    },
+    methods: {
+      ...mapActions(['logOut']),
+    },
+  };
 </script>

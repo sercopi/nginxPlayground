@@ -7,6 +7,7 @@ import Profile from '../views/Profile.vue';
 import About from '../views/About.vue';
 import store from '../store';
 import VerifyEmail from '../views/VerifyEmail';
+import RestorePassword from '../views/RestorePassword';
 /* import authStore from '../store/modules/auth';
  */
 Vue.use(VueRouter);
@@ -36,6 +37,15 @@ const routes = [
     component: Register,
     meta: {
       requiresAuth: false,
+    },
+  },
+  {
+    path: '/restorePassword',
+    name: 'restorePassword',
+    component: RestorePassword,
+    meta: {
+      requiresAuth: false,
+      requiresGuest: true,
     },
   },
   {

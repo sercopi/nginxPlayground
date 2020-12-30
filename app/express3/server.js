@@ -53,6 +53,7 @@ const guestRoutes = [
   '/login',
   '/verifyEmail',
   '/forgotPassword',
+  '/restorePassword',
 ];
 //Authentication middleware, deals with tokens magic
 const checkTokenMiddleware = async (req, res, next) => {
@@ -101,7 +102,6 @@ app.all('*', checkTokenMiddleware);
 
 //Create User
 app.post('/register', async (req, res, next) => {
-  console.log(req.body);
   newUser = {
     email: req.body.email,
     password: req.body.password,
@@ -133,9 +133,11 @@ app.post('/register', async (req, res, next) => {
         })
       );
     });
-  const token = await generateToken({ email: newUser.email });
-  console.log('token generated: ');
-  console.log(token);
+  const token = await generateToken({
+    email: newUser.email,
+    verification: true,
+  });
+
   rabbit.getChannel().then((channel) => {
     rabbit.dispatchVerifyEmailJobToEmailQueue(channel, {
       email: newUser.email,
@@ -220,7 +222,7 @@ app.get('/verifyEmail', async (req, res, next) => {
   try {
     const tokenDecoded = await checkToken(req.query.verifyToken, false);
     console.log(tokenDecoded);
-    if (!tokenDecoded) {
+    if (!tokenDecoded || !tokenDecoded.payload.verification) {
       return res.status(401).send(
         JSON.stringify({
           status: 401,
@@ -255,7 +257,91 @@ app.get('/verifyEmail', async (req, res, next) => {
     );
   }
 });
+app.post('/forgotPassword', async (req, res, next) => {
+  try {
+    const restorationEmail = req.body.email;
+    const token = await generateToken({
+      email: restorationEmail,
+      password_restoration: true,
+    });
+    console.log(token);
+    //send the email only if  the user exists and is validated!
+    const userFound = await getConnection('prueba', 'users').then(
+      (connection) =>
+        connection.findOne({
+          email: restorationEmail,
+        })
+    );
+    if (userFound && userFound.verified) {
+      rabbit.getChannel().then((channel) => {
+        rabbit.dispatchForgotPasswordEmailJobToEmailQueue(channel, {
+          email: restorationEmail,
+          subject: 'a request to change your password has been done!',
+          token: token,
+        });
+      });
+    }
 
+    return res.status(200).send(
+      JSON.stringify({
+        status: 200,
+        error: false,
+        message: 'an email has been sent, please check it!',
+      })
+    );
+  } catch (error) {
+    console.log(error);
+    res.status(500).send(
+      JSON.stringify({
+        status: 500,
+        error: true,
+        message: 'Error with Server',
+      })
+    );
+  }
+});
+app.post('/restorePassword', async (req, res, next) => {
+  try {
+    const newPassword = req.body.password;
+    const tokenDecoded = await checkToken(
+      req.query.restorePasswordToken,
+      false
+    );
+    console.log(tokenDecoded);
+    if (!tokenDecoded || !tokenDecoded.payload.password_restoration) {
+      return res.status(401).send(
+        JSON.stringify({
+          status: 401,
+          error: true,
+          message:
+            'email has expired, please repeat the process to ask for a new one!',
+        })
+      );
+    }
+    const userEmail = tokenDecoded.payload.email;
+    const hash = await bcrypt.hash(newPassword, 10);
+
+    await getConnection('prueba', 'users').then((connection) =>
+      connection.updateOne({ email: userEmail }, { $set: { password: hash } })
+    );
+    return res.status(200).send(
+      JSON.stringify({
+        status: 200,
+        error: false,
+        message: 'password restored, please log in!',
+      })
+    );
+  } catch (error) {
+    console.log(error);
+    res.status(500).send(
+      JSON.stringify({
+        status: 500,
+        error: true,
+        message: 'Error with Server',
+      })
+    );
+  }
+});
 app.listen(port, () => {
   console.log(`Example app listening at http://localhost:${port}`);
 });

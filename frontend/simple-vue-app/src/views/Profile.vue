@@ -10,12 +10,11 @@
           width="1500"
           class="text-center pt-5"
         >
-        
         </v-sheet>
       </v-col>
     </v-row>
   </v-container>
 </template>
 <script>
-export default {};
+  export default {};
 </script>

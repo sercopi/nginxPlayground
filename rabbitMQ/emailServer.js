@@ -31,7 +31,6 @@ rabbit
     console.log('email server connected!');
 
     channel.consume(config.QUEUE_VERIFY_EMAIL, async (data) => {
-      console.log(data);
       const emailData = JSON.parse(data.content);
       console.log('sending email');
       const text =
@@ -50,6 +49,24 @@ rabbit
       channel.ack(data);
       console.log('Respuesta del servidor de correo: ' + responseMailServer);
     });
-    channel.consume(config.QUEUE_FORGOT_PASSWORD, async (msg) => {});
+    channel.consume(config.QUEUE_FORGOT_PASSWORD, async (data) => {
+      const emailData = JSON.parse(data.content);
+      console.log('sending email to restore password');
+      const text =
+        config.CLIENT_ADDRESS +
+        config.CLIENT_FORGOT_PASSWORD_ENDPOINT +
+        '?restorePasswordToken=' +
+        emailData.token;
+      const responseMailServer = await generateEmail({
+        email: emailData.email,
+        subject: emailData.subject,
+        text: text,
+      });
+      console.log(responseMailServer);
+      //confirma que se ha enviado el correo y lo elimina de la cola
+
+      channel.ack(data);
+      console.log('Respuesta del servidor de correo: ' + responseMailServer);
+    });
   })
   .catch((err) => console.log(err));
