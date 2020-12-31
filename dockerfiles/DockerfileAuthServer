@@ -1,6 +1,6 @@
 FROM node:12
 RUN mkdir /app
 WORKDIR /app 
-COPY ./app/express3/package*.json ./
+COPY ./backend/authServer/package*.json ./
 RUN npm i
 CMD ["sh", "./startExpress.sh"]

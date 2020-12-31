@@ -29,7 +29,7 @@ const getConnection = async (database, collection = null) => {
     });
 };
 //check token
-const checkToken = async (tokenFromClient, isAuthToken = true) => {
+const decodeToken = async (tokenFromClient, isAuthToken = true) => {
   let tokenArrayParts = tokenFromClient.split(' ');
   let token = tokenFromClient;
   if (isAuthToken) {
@@ -47,38 +47,35 @@ const checkToken = async (tokenFromClient, isAuthToken = true) => {
     return false;
   }
 };
-const guestRoutes = [
-  '/',
-  '/register',
-  '/login',
-  '/verifyEmail',
-  '/forgotPassword',
-  '/restorePassword',
-];
 //Authentication middleware, deals with tokens magic
-const checkTokenMiddleware = async (req, res, next) => {
+app.post('/checkAuthToken', async (req, res, next) => {
   //if the route doesnt require a token, it lets it through
-  if (guestRoutes.includes(req.path)) return next();
   //the token is decoded.
-  const tokenDecoded = await checkToken(req.headers.authorization);
-  //check if the token can be uncoded AND check if final expiration date is due
-  if (
-    tokenDecoded !== false &&
-    !moment().isAfter(tokenDecoded.finalExpirationDate)
-  ) {
-    //the token is refreshed and its data is passed to the next route
-    console.log('refreshing token!');
-    res.locals.payload = tokenDecoded.payload;
-    res.locals.Auth = await generateToken(
-      tokenDecoded.payload,
-      tokenDecoded.finalExpirationDate
-    );
-    return next();
+  try {
+    const tokenDecoded = await decodeToken(req.body.token);
+    //check if the token can be uncoded AND check if final expiration date is due
+    if (
+      tokenDecoded !== false &&
+      !moment().isAfter(tokenDecoded.finalExpirationDate)
+    ) {
+      //the token is refreshed and its data is passed to the next route
+      console.log('refreshing token!');
+      const refreshedToken = await generateToken(
+        tokenDecoded.payload,
+        tokenDecoded.finalExpirationDate
+      );
+      return res
+        .status(200)
+        .send({ status: 200, error: false, token: refreshedToken });
+    }
+    //if the token expired or is not coded correctly,
+    //send back an auth error to be handled by the client
+    res.send({ status: 440, error: true, message: 'Session Expired' });
+  } catch (error) {
+    console.log(error);
+    res.status(500).send({ status: 500, error: true, message: 'server error' });
   }
-  //if the token expired or is not coded correctly,
-  //send back an auth error to be handled by the client
-  res.send({ status: 440, error: true, message: 'Session Expired' });
-};
+});
 //generate token or refresh an old one if a finalExpirationDate is passed
 const generateToken = async (payload, finalExpirationDate = null) => {
   const privateKey = fs.readFileSync('./auth/jwt/private.pem');
@@ -98,10 +95,9 @@ const generateToken = async (payload, finalExpirationDate = null) => {
     { expiresIn: 10 }
   );
 };
-app.all('*', checkTokenMiddleware);
 
 //Create User
-app.post('/register', async (req, res, next) => {
+app.post('/auth-api/register', async (req, res, next) => {
   newUser = {
     email: req.body.email,
     password: req.body.password,
@@ -166,7 +162,7 @@ app.post('/register', async (req, res, next) => {
     });
 });
 //login
-app.post('/login', async (req, res, next) => {
+app.post('/auth-api/login', async (req, res, next) => {
   user = {
     email: req.body.email,
     password: req.body.password,
@@ -203,9 +199,7 @@ app.post('/login', async (req, res, next) => {
     .status(401)
     .send({ status: 401, error: true, message: 'Bad Credentials' });
 });
-app.post('/profile', async (req, res, next) => {});
-app.get('/checkAuthParams', async (req, res, next) => {
-  console.log('auth params checked');
+app.get('/auth-api/checkAuthParams', async (req, res, next) => {
   const payload = res.locals.payload;
   const token = res.locals.token;
   return res.status(200).send(
@@ -218,9 +212,9 @@ app.get('/checkAuthParams', async (req, res, next) => {
   );
 });
 
-app.get('/verifyEmail', async (req, res, next) => {
+app.get('/auth-api/verifyEmail', async (req, res, next) => {
   try {
-    const tokenDecoded = await checkToken(req.query.verifyToken, false);
+    const tokenDecoded = await decodeToken(req.query.verifyToken, false);
     console.log(tokenDecoded);
     if (!tokenDecoded || !tokenDecoded.payload.verification) {
       return res.status(401).send(
@@ -257,7 +251,7 @@ app.get('/verifyEmail', async (req, res, next) => {
     );
   }
 });
-app.post('/forgotPassword', async (req, res, next) => {
+app.post('/auth-api/forgotPassword', async (req, res, next) => {
   try {
     const restorationEmail = req.body.email;
     const token = await generateToken({
@@ -300,10 +294,10 @@ app.post('/forgotPassword', async (req, res, next) => {
     );
   }
 });
-app.post('/restorePassword', async (req, res, next) => {
+app.post('/auth-api/restorePassword', async (req, res, next) => {
   try {
     const newPassword = req.body.password;
-    const tokenDecoded = await checkToken(
+    const tokenDecoded = await decodeToken(
       req.query.restorePasswordToken,
       false
     );

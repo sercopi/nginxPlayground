@@ -11,8 +11,8 @@ RUN npm install
 COPY ./rabbitMQ/emailServer.js .
 COPY ./rabbitMQ/rabbit.js .
 COPY ./rabbitMQ/config.js .
-COPY ./start.sh .
-COPY ./wait-for-it.sh .
+COPY ./rabbitMQ/start.sh .
+COPY ./rabbitMQ/wait-for-it.sh .
 RUN ["chmod", "+x", "start.sh"]
 RUN ["chmod", "+x", "wait-for-it.sh"]
 

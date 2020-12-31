@@ -36,7 +36,7 @@
     mounted() {
       const token = this.$route.query.verifyToken;
       this.logOut();
-      fetch(constants.API_URL + '/verifyEmail?verifyToken=' + token, {
+      fetch(constants.API_AUTH_URL + '/verifyEmail?verifyToken=' + token, {
         method: 'get',
       })
         .then((response) => response.json())

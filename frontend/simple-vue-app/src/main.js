@@ -9,7 +9,7 @@ import constants from './lib/constants';
 Vue.config.productionTip = false;
 
 const checkAuthParamsWithBackend = async (token) => {
-  return fetch(constants.API_URL + '/checkAuthParams', {
+  return fetch(constants.API_AUTH_URL + '/checkAuthParams', {
     method: 'get',
     headers: {
       Authorization: 'Bearer ' + token,

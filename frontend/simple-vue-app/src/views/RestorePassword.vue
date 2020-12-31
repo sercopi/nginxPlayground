@@ -83,7 +83,9 @@
         const token = this.$route.query.restorePasswordToken;
         this.logOut();
         fetch(
-          constants.API_URL + '/restorePassword?restorePasswordToken=' + token,
+          constants.API_AUTH_URL +
+            '/restorePassword?restorePasswordToken=' +
+            token,
           {
             method: 'POST',
             body: JSON.stringify({

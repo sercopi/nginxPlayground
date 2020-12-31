@@ -1,0 +1,6 @@
+FROM node:12
+RUN mkdir /app
+WORKDIR /app 
+COPY ./backend/API/package*.json ./
+RUN npm i
+CMD ["npm" ,"run" ,"start-dev"]

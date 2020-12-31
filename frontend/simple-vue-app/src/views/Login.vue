@@ -119,7 +119,7 @@
       ...mapActions(['setNewAuthParams']),
       forgot_password() {
         this.isForgotPassword = true;
-        fetch(constants.API_URL + '/forgotPassword', {
+        fetch(constants.API_AUTH_URL + '/forgotPassword', {
           method: 'post',
           body: JSON.stringify({
             email: this.forgotPasswordEmail,
@@ -145,13 +145,16 @@
       },
       login() {
         this.loading = true;
-        fetch(constants.API_URL + '/login', {
+        fetch(constants.API_AUTH_URL + '/login', {
+          mode: 'cors',
+
           method: 'post',
           body: JSON.stringify({
             email: this.email,
             password: this.password,
           }),
           headers: {
+            'Access-Control-Allow-Origin': '*',
             'Content-Type': 'application/json',
           },
         })
